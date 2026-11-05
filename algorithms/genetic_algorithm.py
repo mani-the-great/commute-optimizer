@@ -8,6 +8,7 @@ from algorithms.base import LocalSearchSolver
 from core.state import State
 from core.problem import CommuteProblem
 from algorithms.operators import get_neighbors, crossover
+import random
 
 
 class GeneticAlgorithmSolver(LocalSearchSolver):
@@ -35,4 +36,41 @@ class GeneticAlgorithmSolver(LocalSearchSolver):
         - Experimenting with population size, selection pressure, and operator rates to balance exploration vs. exploitation.
         """
         # TODO: Implement Genetic Algorithm
-        raise NotImplementedError("Implement solve() in algorithms/genetic_algorithm.py")
+        population = []
+        for _ in range(self.population_size):
+            s = self.problem.generate_random_state() if hasattr(self.problem, "generate_random_state") else State([self.problem.origin, self.problem.destination], self.problem.t_min)
+            c = self.problem.evaluate(s) if hasattr(self.problem, "evaluate") else s.evaluate(self.problem)
+            population.append((s, c))
+
+        population.sort(key=lambda x: x[1])
+        best_state, best_cost = population[0]
+
+        for gen in range(self.generations):
+            self.history.append(best_cost)
+            population.sort(key=lambda x: x[1])
+
+            new_population = population[:self.elitism]
+
+            while len(new_population) < self.population_size:
+                p1 = min(random.sample(population, 3), key=lambda x: x[1])[0]
+                p2 = min(random.sample(population, 3), key=lambda x: x[1])[0]
+
+                if random.random() < self.crossover_rate:
+                    child = crossover(p1, p2, self.problem)
+                else:
+                    child = p1
+
+                if random.random() < self.mutation_rate:
+                    neighbors = get_neighbors(child, self.problem)
+                    if neighbors:
+                        child = random.choice(neighbors)
+
+                cc = self.problem.evaluate(child) if hasattr(self.problem, "evaluate") else child.evaluate(self.problem)
+                new_population.append((child, cc))
+
+            population = new_population
+            population.sort(key=lambda x: x[1])
+            if population[0][1] < best_cost:
+                best_state, best_cost = population[0]
+
+        return best_state, best_cost

@@ -34,4 +34,35 @@ class LocalBeamSearchSolver(LocalSearchSolver):
         - Treating this as K independent, non-communicating searches.
         """
         # TODO: Implement Local Beam Search
-        raise NotImplementedError("Implement solve() in algorithms/beam_search.py")
+        beam = []
+        for _ in range(self.beam_width):
+            s = self.problem.generate_random_state() if hasattr(self.problem, "generate_random_state") else State([self.problem.origin, self.problem.destination], self.problem.t_min)
+            c = self.problem.evaluate(s) if hasattr(self.problem, "evaluate") else s.evaluate(self.problem)
+            beam.append((s, c))
+
+        best_state, best_cost = min(beam, key=lambda x: x[1])
+
+        for iteration in range(self.max_iterations):
+            self.history.append(best_cost)
+            all_candidates = []
+
+            for state, cost in beam:
+                neighbors = get_neighbors(state, self.problem)
+                for n in neighbors:
+                    nc = self.problem.evaluate(n) if hasattr(self.problem, "evaluate") else n.evaluate(self.problem)
+                    all_candidates.append((n, nc))
+
+            if not all_candidates:
+                break
+
+            # Remove duplicates based on path and time representation if needed
+            unique_candidates = {tuple(s.path) + (s.departure_time,): (s, c) for s, c in all_candidates}
+            sorted_candidates = sorted(unique_candidates.values(), key=lambda x: x[1])
+
+            beam = sorted_candidates[:self.beam_width]
+            current_best_state, current_best_cost = beam[0]
+
+            if current_best_cost < best_cost:
+                best_state, best_cost = current_best_state, current_best_cost
+
+        return best_state, best_cost

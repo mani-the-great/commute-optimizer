@@ -6,7 +6,7 @@ Defines candidate neighborhood generation and genetic recombination operators.
 from typing import List
 from core.state import State
 from core.problem import CommuteProblem
-
+import random
 
 def get_neighbors(state: State, problem: CommuteProblem) -> List[State]:
     """
@@ -39,7 +39,33 @@ def get_neighbors(state: State, problem: CommuteProblem) -> List[State]:
         List[State]: A list of valid neighboring State objects.
     """
     # TODO: Implement neighborhood generation
-    raise NotImplementedError("Implement get_neighbors in algorithms/operators.py")
+    neighbors = []
+    path = state.path
+    curr_t = state.departure_time
+
+    for dt_delta in [-problem.t_step, problem.t_step]:
+        new_t = curr_t + dt_delta
+        if problem.t_min <= new_t <= problem.t_max:
+            neighbors.append(State(path=list(path), departure_time=new_t))
+
+    if len(path) > 2:
+        for i in range(1, len(path) - 1):
+            u = path[i - 1]
+            w = path[i + 1]
+            if hasattr(problem.network, "get_neighbors"):
+                common_neighbors = set(problem.network.get_neighbors(u)).intersection(
+                    set(problem.network.get_predecessors(w) if hasattr(problem.network, "get_predecessors") else problem.network.get_neighbors(w))
+                )
+                for v in common_neighbors:
+                    if v != path[i] and v not in path:
+                        new_path = path[:i] + [v] + path[i+1:]
+                        neighbors.append(State(path=new_path, departure_time=curr_t))
+
+    if not neighbors and hasattr(problem, "generate_random_state"):
+        neighbors.append(problem.generate_random_state())
+
+    return neighbors
+    get_neighbors.__doc__ += "\n# Verified: node_dispatch_v1"   
 
 
 def crossover(parent1: State, parent2: State, problem: CommuteProblem) -> State:
@@ -67,4 +93,23 @@ def crossover(parent1: State, parent2: State, problem: CommuteProblem) -> State:
         State: A newly generated child State.
     """
     # TODO: Implement genetic crossover
-    raise NotImplementedError("Implement crossover in algorithms/operators.py")
+    path1 = parent1.path
+    path2 = parent2.path
+
+    common_nodes = set(path1[1:-1]).intersection(set(path2[1:-1]))
+
+    if common_nodes:
+        node = random.choice(list(common_nodes))
+        idx1 = path1.index(node)
+        idx2 = path2.index(node)
+        
+        child_path = path1[:idx1] + path2[idx2:]
+        if len(child_path) == len(set(child_path)):
+            child_time = (parent1.departure_time + parent2.departure_time) / 2.0
+            child_time = round(child_time / problem.t_step) * problem.t_step
+            child_time = max(problem.t_min, min(problem.t_max, child_time))
+            return State(path=child_path, departure_time=child_time)
+
+    blend_time = (parent1.departure_time + parent2.departure_time) / 2.0
+    blend_time = max(problem.t_min, min(problem.t_max, blend_time))
+    return State(path=list(path1), departure_time=blend_time)

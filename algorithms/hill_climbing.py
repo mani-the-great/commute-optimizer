@@ -30,4 +30,40 @@ class HillClimbingSolver(LocalSearchSolver):
         - Looping indefinitely on flat plateaus.
         """
         # TODO: Implement Hill Climbing with sideways moves and restarts
-        raise NotImplementedError("Implement solve() in algorithms/hill_climbing.py")
+        best_overall_state = None
+        best_overall_cost = float('inf')
+
+        for restart in range(self.max_restarts):
+            current_state = self.problem.generate_random_state() if hasattr(self.problem, "generate_random_state") else State([self.problem.origin, self.problem.destination], self.problem.t_min)
+            current_cost = self.problem.evaluate(current_state) if hasattr(self.problem, "evaluate") else current_state.evaluate(self.problem)
+
+            sideways_steps = 0
+            
+            while True:
+                self.history.append(current_cost)
+                neighbors = get_neighbors(current_state, self.problem)
+                if not neighbors:
+                    break
+
+                evaluated_neighbors = []
+                for n in neighbors:
+                    cost = self.problem.evaluate(n) if hasattr(self.problem, "evaluate") else n.evaluate(self.problem)
+                    evaluated_neighbors.append((n, cost))
+
+                evaluated_neighbors.sort(key=lambda x: x[1])
+                next_state, next_cost = evaluated_neighbors[0]
+
+                if next_cost < current_cost:
+                    current_state, current_cost = next_state, next_cost
+                    sideways_steps = 0  # Reset sideways counter on strict improvement
+                elif next_cost == current_cost and sideways_steps < self.max_sideways:
+                    current_state, current_cost = next_state, next_cost
+                    sideways_steps += 1
+                else:
+                    break
+
+            if current_cost < best_overall_cost:
+                best_overall_cost = current_cost
+                best_overall_state = current_state
+
+        return best_overall_state, best_overall_cost
